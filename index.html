@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>{{PET_NAME}}'s Big Adventure! 🐾</title>
+
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+    background: #1a1a2e;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: monospace;
+    overflow: hidden;
+    user-select: none;
+    touch-action: pan-x pan-y;
+}
+#ui {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 480px;
+    max-width: 95vw;
+    padding: 8px 4px;
+}
+#ui span { color: #fff; font-size: 7px; text-shadow: 0 0 5px #000; }
+#hearts-ui { color: #ffd700 !important; }
+canvas {
+    display: block;
+    border: 4px solid #4a90d9;
+    background: #222;
+    image-rendering: pixelated;
+    touch-action: none;
+    max-width: 95vw;
+}
+#controls { display: flex; gap: 24px; margin-top: 16px; z-index: 2; }
+.btn {
+    background: #333;
+    border: 2px solid #4a90d9;
+    color: white;
+    padding: 22px 36px;
+    border-radius: 12px;
+    font-family: monospace;
+    font-size: 14px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+}
+#overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.95);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    text-align: center;
+    padding: 20px;
+}
+#overlay h1 { color: #4a90d9; font-size: 16px; margin-bottom: 15px; text-transform: uppercase; }
+#overlay p { color: #ccc; font-size: 8px; line-height: 1.8; margin-bottom: 20px; white-space: pre-line; }
+.color-select { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+.color-opt { width: 45px; height: 45px; border: 3px solid #fff; cursor: pointer; border-radius: 5px; }
+.active-opt { border-color: #4a90d9 !important; transform: scale(1.1); box-shadow: 0 0 10px #4a90d9; }
+.color-opt span {
+    display: block;
+    color: #fff;
+    font-size: 6px;
+    text-align: center;
+    margin-top: 4px;
+    pointer-events: none;
+}
+
+.color-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.color-wrap span { color: #fff; font-size: 6px; }
+
+#start-btn {
+    background: #4a90d9; border: none; color: white;
+    padding: 15px 30px; font-family: monospace; cursor: pointer; font-size: 10px;
+}
+#power-indicator { color: #ff4d4d; font-size: 8px; margin-top: 5px; height: 10px; }
+</style>
+</head>
+<body>
+
+<div id="ui">
+  <span id="level-ui">LEVEL 1</span>
+  <span id="hearts-ui">🦴 0/5</span>
+  <span id="lives-ui">LIVES: 3</span>
+</div>
+
+<canvas id="game" width="480" height="320"></canvas>
+<div id="power-indicator"></div>
+
+<div id="controls">
+  <button class="btn" id="btn-left">◀</button>
+  <button class="btn" id="btn-jump">▲</button>
+  <button class="btn" id="btn-right">▶</button>
+</div>
+
+<div id="overlay">
+  <h1 id="ov-title" id="ov-title"></h1>
+    <p id="ov-msg"></p>
+<p style="color:#fff; font-size:7px; margin-bottom:8px;">Pick your dog's color:</p>
+<div class="color-select">
+    <div class="color-wrap"><div class="color-opt active-opt" data-idx="0" style="background:#edc9af"></div><span>Tan</span></div>
+    <div class="color-wrap"><div class="color-opt" data-idx="1" style="background:#222222"></div><span>Black</span></div>
+    <div class="color-wrap"><div class="color-opt" data-idx="2" style="background:#eeeeee"></div><span>White</span></div>
+    <div class="color-wrap"><div class="color-opt" data-idx="3" style="background:#e8a825"></div><span>Golden</span></div>
+    <div class="color-wrap"><div class="color-opt" data-idx="4" style="background:#7e5835"></div><span>Brown</span></div>
+    <div class="color-wrap"><div class="color-opt" data-idx="5" style="background:#888888"></div><span>Grey</span></div>
+</div>
+
+  <button id="start-btn">START PLAYING</button>
+</div>
+<script>
+window.onload = function() {
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const W = 480, H = 320;
+
+    const params = new URLSearchParams(window.location.search);
+    const PET_NAME   = params.get("pet")   || ("{{PET_NAME}}".includes("{{")      ? "Good Dog"        : "{{PET_NAME}}");
+    const OWNER_NAME = params.get("owner") || ("{{OWNER_NAME}}".includes("{{")    ? "Your Human"      : "{{OWNER_NAME}}");
+    const OWNER_MSG  = params.get("msg")   || ("{{OWNER_MESSAGE}}".includes("{{") ? "You made it home!" : "{{OWNER_MESSAGE}}");
+    document.getElementById('ov-title').textContent = `${PET_NAME}'S ADVENTURE!`;
+document.getElementById('ov-msg').textContent = `Collect all the bones 🦴 and reach the Dog House!\nWatch out for Vacuums 🤖 — grab the big bone 🦴 for protection!\n\nUse ◀ ▶ to move and ▲ to jump.\n\nWith love from ${OWNER_NAME}`;
+
+    // Rule: dark dog (Black, Brown) → LIGHT bg so dog pops
+    //       light dog (Tan, White, Golden, Grey) → DARK bg
+    const DOG_PALETTES = [
+        { name:'Tan',    main:'#edc9af', belly:'#f5e4d0', ear:'#c49a6c', nose:'#3d2b1f', eye:'#3d2b1f',
+          bg:'#0c0a18', platform:'#1e1830', platformTop:'#2e2848' },
+        { name:'Black',  main:'#2a2a2a', belly:'#FFFFFF', ear:'#111111', nose:'#888888', eye:'#88ccff',
+          bg:'#c8bfa0', platform:'#a89878', platformTop:'#c8b888' },
+        { name:'White',  main:'#eeeeee', belly:'#ffffff', ear:'#cccccc', nose:'#cc8888', eye:'#4a90d9',
+          bg:'#1a1a2e', platform:'#2e2e50', platformTop:'#404070' },
+        { name:'Golden', main:'#e8a825', belly:'#f5d27a', ear:'#b06a00', nose:'#3d2b1f', eye:'#3d2b1f',
+          bg:'#0d1020', platform:'#1a2040', platformTop:'#253060' },
+        { name:'Brown',  main:'#7e5835', belly:'#a07048', ear:'#3e2820', nose:'#1a0e0a', eye:'#88ccff',
+          bg:'#b8c8a8', platform:'#8aaa78', platformTop:'#aac898' },
+        { name:'Grey',   main:'#909090', belly:'#bbbbbb', ear:'#606060', nose:'#333333', eye:'#4a90d9',
+          bg:'#0a0a0a', platform:'#1e1e1e', platformTop:'#303030' },
+    ];
+
+    let selectedDog = 0;
+    let gameActive = false;
+    let curLvl = 0, score = 0, lives = 3, power = 0, flashTimer = 0;
+    let player = { x:30, y:200, vx:0, vy:0, ground:false, dir:1 };
+    let vacs = [], bones = [], steaks = [];
+    let jumpLocked = false;
+    const keys = { left:false, right:false, jump:false };
+
+    const LEVELS = [
+      {
+        platforms:[{x:0,y:288,w:480,h:32},{x:100,y:220,w:100,h:15},{x:280,y:180,w:100,h:15},{x:50,y:140,w:80,h:15}],
+        bones:[{x:120,y:200},{x:300,y:160},{x:70,y:120},{x:400,y:260},{x:200,y:260}],
+        steaks:[{x:330,y:260}],
+        vacuums:[{x:250,y:274,range:100,speed:1.5,dir:1}],
+        bed:{x:420,y:260}, goal:5
+      },
+      {
+        platforms:[{x:0,y:288,w:150,h:32},{x:200,y:240,w:100,h:15},{x:350,y:288,w:130,h:32},{x:100,y:160,w:80,h:15},{x:250,y:120,w:100,h:15}],
+        bones:[{x:30,y:260},{x:220,y:220},{x:380,y:260},{x:120,y:140},{x:270,y:100},{x:440,y:260}],
+        steaks:[{x:400,y:180}],
+        vacuums:[{x:80,y:274,range:50,speed:2,dir:1},{x:380,y:274,range:40,speed:2,dir:-1}],
+        bed:{x:420,y:260}, goal:6
+      },
+      {
+        platforms:[{x:0,y:288,w:480,h:32},{x:50,y:220,w:60,h:15},{x:150,y:170,w:60,h:15},{x:250,y:120,w:100,h:15},{x:380,y:180,w:80,h:15}],
+        bones:[{x:20,y:260},{x:80,y:190},{x:180,y:140},{x:300,y:90},{x:420,y:150},{x:450,y:260}],
+        steaks:[{x:280,y:260}],
+        vacuums:[{x:100,y:274,range:60,speed:2.2,dir:1},{x:300,y:274,range:80,speed:1.8,dir:-1},{x:250,y:106,range:40,speed:3,dir:1}],
+        bed:{x:420,y:260}, goal:6
+      }
+    ];
+
+    function getPal() {
+        const p = DOG_PALETTES[selectedDog];
+    
+        const isDarkDog = ['Black', 'Brown', 'Grey'].includes(p.name);
+    
+        return {
+            ...p,
+            bg: isDarkDog ? '#e6dcc5' : '#0b0f1a',
+            platform: isDarkDog ? '#c2b59b' : '#1c2540',
+            platformTop: isDarkDog ? '#a89a7a' : '#2e3a6b'
+        };
+    }
+
+    function init(lvlIdx) {
+        const L = LEVELS[lvlIdx];
+        score = 0; power = 0;
+        player = { x:30, y:200, vx:0, vy:0, ground:false, dir:1 };
+        bones  = L.bones.map(b  => ({...b,  collected:false}));
+        steaks = L.steaks.map(s => ({...s,  collected:false}));
+        vacs   = L.vacuums.map(v => ({...v, startX:v.x}));
+        updateUI();
+    }
+
+    function updateUI() {
+        document.getElementById('hearts-ui').textContent = `🦴 ${score}/${LEVELS[curLvl].goal}`;
+        document.getElementById('level-ui').textContent  = `LEVEL ${curLvl + 1}`;
+        document.getElementById('lives-ui').textContent  = `LIVES: ${lives}`;
+    }
+
+    // Fills a 1px dark border around a rect (pixel-art outline helper)
+    function darkBorder(x, y, w, h) {
+        ctx.fillRect(x-1, y-1, w+2, 1);   // top
+        ctx.fillRect(x-1, y+h, w+2, 1);   // bottom
+        ctx.fillRect(x-1, y,   1,   h);   // left
+        ctx.fillRect(x+w, y,   1,   h);   // right
+    }
+    function outlineRect(x, y, w, h, color = 'rgba(0,0,0,0.6)') {
+    ctx.fillStyle = color;
+    ctx.fillRect(x-1, y-1, w+2, 1);
+    ctx.fillRect(x-1, y+h, w+2, 1);
+    ctx.fillRect(x-1, y, 1, h);
+    ctx.fillRect(x+w, y, 1, h);
+    }
+    function drawDog(x, y, dir, pwr) {
+        const c   = getPal();
+        const wag = Math.sin(Date.now() / 50) * 3;
+
+        ctx.save();
+        ctx.translate(x, y);
+
+        // 🔥 grounding shadow (this changes everything visually)
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillRect(5, 30, 18, 4);
+        
+        // name tag
+        ctx.fillStyle = '#fff';
+        ctx.font = "6px monospace";
+        ctx.textAlign = 'center';
+        ctx.fillText(PET_NAME.toUpperCase(), 15, -8);
+
+        if (dir < 0) { ctx.translate(28, 0); ctx.scale(-1, 1); }
+        if (pwr > 0) { ctx.shadowBlur = 15; ctx.shadowColor = '#ff4d4d'; }
+
+        // ── OUTLINE PASS ──────────────────────────────────
+        ctx.fillStyle = 'rgba(0,0,0,0.9)';
+
+        // tail outline
+        ctx.save();
+        ctx.translate(2, 12);
+        ctx.rotate(wag * Math.PI / 180);
+        darkBorder(-7, -3, 8, 5);
+        ctx.restore();
+
+        darkBorder(2,  14, 24, 14); // body
+        darkBorder(5,  26,  6,  8); // front leg
+        darkBorder(18, 26,  6,  8); // back leg
+        darkBorder(18,  8, 10,  8); // neck
+        darkBorder(20,  2, 16, 14); // head
+        darkBorder(32,  8,  8,  7); // snout
+        darkBorder(20,  0,  6,  8); // ear
+
+        // ── COLOUR PASS ───────────────────────────────────
+
+        // tail
+        ctx.fillStyle = c.main;
+        ctx.save();
+        ctx.translate(2, 12);
+        ctx.rotate(wag * Math.PI / 180);
+        ctx.fillRect(-7, -3, 8, 5);
+        ctx.restore();
+
+        // belly patch
+        ctx.fillStyle = c.belly;
+        ctx.fillRect(6, 18, 12, 10);
+
+        // body
+        ctx.fillStyle = c.main;
+        ctx.fillRect(2, 14, 24, 14);
+
+        // legs
+        ctx.fillRect(5,  26, 6, 8);
+        ctx.fillRect(18, 26, 6, 8);
+
+        // paws
+        ctx.fillStyle = c.belly;
+        ctx.fillRect(5,  31, 6, 3);
+        ctx.fillRect(18, 31, 6, 3);
+
+        // neck
+        ctx.fillStyle = c.main;
+        ctx.fillRect(18, 8, 10, 8);
+
+        // head
+        ctx.fillRect(20, 2, 16, 14);
+
+        // snout
+        ctx.fillStyle = c.belly;
+        ctx.fillRect(32, 8, 8, 7);
+
+        // nose
+        ctx.fillStyle = c.nose;
+        ctx.fillRect(37, 8, 4, 3);
+
+        // ear
+        ctx.fillStyle = c.ear;
+        ctx.fillRect(20, 0, 6, 8);
+        ctx.fillRect(19, 2, 3, 5);
+
+        // eye
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(28, 5, 5, 4);
+        ctx.fillStyle = c.eye;
+        ctx.fillRect(29, 6, 3, 3);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(30, 6, 2, 2);
+
+        // collar
+        ctx.fillStyle = '#e74c3c';
+        ctx.fillRect(18, 12, 10, 3);
+        ctx.fillStyle = '#f39c12';
+        ctx.fillRect(22, 13, 3, 3);
+
+        ctx.restore();
+    }
+
+    function drawVacuum(v) {
+        ctx.save();
+        ctx.translate(v.x, v.y);
+
+        // floor head
+        ctx.fillStyle = '#555';
+        ctx.fillRect(-18, 14, 36, 8);
+        ctx.fillStyle = '#333';
+        ctx.fillRect(-18, 20, 36, 3);
+
+        // spinning brush dots
+        ctx.fillStyle = '#ffcc00';
+        for (let i = 0; i < 4; i++) {
+            let bx = -12 + i*8 + (Math.floor(Date.now()/80) % 2)*4;
+            ctx.fillRect(bx, 21, 3, 2);
+        }
+
+        // canister
+        ctx.fillStyle = '#c0392b';
+        ctx.fillRect(-8, -10, 16, 26);
+        ctx.fillStyle = '#e74c3c';
+        ctx.fillRect(-8, 2, 16, 4);
+        ctx.fillRect(8, -6, 4, 16); // dust bag bump
+
+        // handle
+        ctx.fillStyle = '#444';
+        ctx.fillRect(-2, -28, 4, 20);
+        ctx.fillStyle = '#333';
+        ctx.fillRect(-8, -32, 14, 5);
+        ctx.fillRect(-8, -32,  4, 10);
+
+        // suction tube
+        ctx.fillStyle = '#888';
+        ctx.fillRect(-10, 10, 4, 5);
+
+        // power light
+        ctx.fillStyle = (Math.floor(Date.now()/300) % 2 === 0) ? '#ff0000' : '#660000';
+        ctx.fillRect(4, -4, 4, 4);
+
+        ctx.restore();
+    }
+
+    function drawBone(x, y) {
+    ctx.fillStyle = '#f5f5f5';
+    ctx.fillRect(x-6, y-2, 12, 4);
+    ctx.fillRect(x-8, y-4, 4, 4);
+    ctx.fillRect(x-8, y, 4, 4);
+    ctx.fillRect(x+4, y-4, 4, 4);
+    ctx.fillRect(x+4, y, 4, 4);
+
+    outlineRect(x-8, y-4, 16, 8, '#000');
+    }
+
+    // Pixel-art chicken drumstick — matches reference: round dark-brown bulb + grey bone knob
+   function drawChicken(x, y) {
+    ctx.save();
+    ctx.translate(x, y);
+
+    // slight bounce animation
+    const bob = Math.sin(Date.now() / 150) * 2;
+    ctx.translate(0, bob);
+
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(-14, 10, 28, 4);
+
+    // glow (power-up feel)
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = '#ffd700';
+
+    // main bone (bigger + thicker)
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(-10, -3, 20, 6);
+
+    // bone ends (round knobs)
+    ctx.fillRect(-14, -6, 6, 6);
+    ctx.fillRect(-14,  0, 6, 6);
+    ctx.fillRect(  8, -6, 6, 6);
+    ctx.fillRect(  8,  0, 6, 6);
+
+    // outline (important for contrast)
+    outlineRect(-14, -6, 28, 12, '#000');
+
+    ctx.restore();
+}
+
+    function drawDogHouse(x, y) {
+        // shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillRect(x-22, y+28, 44, 6);
+
+        // main structure
+        ctx.fillStyle = '#7e5835';
+        ctx.fillRect(x-20, y+8, 40, 22);
+
+        // roof
+        ctx.fillStyle = '#c0392b';
+        ctx.fillRect(x-24, y+4, 48, 6);  // roof base
+        ctx.fillRect(x-18, y-2, 36, 8);  // mid roof
+        ctx.fillRect(x-10, y-8, 20, 8);  // peak
+
+        // roof outline
+        outlineRect(x-24, y-8, 48, 20, '#000');
+
+        // door
+        ctx.fillStyle = '#1a0e0a';
+        ctx.fillRect(x-8, y+14, 16, 16);
+
+        // door arch top
+        ctx.fillRect(x-10, y+12, 20, 4);
+
+        // wood grain lines
+        ctx.fillStyle = '#5c3d1e';
+        ctx.fillRect(x-20, y+14, 40, 2);
+        ctx.fillRect(x-20, y+22, 40, 2);
+
+        // structure outline
+        outlineRect(x-20, y+8, 40, 22, '#000');
+
+        // glow when goal reached
+        if (score >= LEVELS[curLvl].goal) {
+            ctx.strokeStyle = '#ffd700';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x-26, y-10, 52, 50);
+        }
+    }
+
+    function update() {
+        if (!gameActive) return;
+
+        if (keys.left)       { player.vx = -3.2; player.dir = -1; }
+        else if (keys.right) { player.vx =  3.2; player.dir =  1; }
+        else                 { player.vx = 0; }
+
+        if (keys.jump && player.ground && !jumpLocked) {
+            player.vy = -10;
+            player.ground = false;
+            jumpLocked = true;
+        }
+
+        player.vy += 0.5;
+        player.x  += player.vx;
+        player.y  += player.vy;
+        player.ground = false;
+
+        const L = LEVELS[curLvl];
+        L.platforms.forEach(p => {
+            if (player.x+25 > p.x && player.x < p.x+p.w && player.y+28 > p.y && player.y+28 < p.y+p.h) {
+                if (player.vy > 0) { player.y = p.y-28; player.vy = 0; player.ground = true; }
+            }
+        });
+
+        if (player.x < 0)    player.x = 0;
+        if (player.x > W-30) player.x = W-30;
+        if (player.y > H)    { lives--; flashTimer = 20; if (lives <= 0) showGameOver(); else init(curLvl); }
+
+        bones.forEach(b => {
+            if (!b.collected && Math.hypot(player.x+15-b.x, player.y+15-b.y) < 25) {
+                b.collected = true; score++; updateUI();
+            }
+        });
+        steaks.forEach(s => {
+            if (!s.collected && Math.hypot(player.x+15-s.x, player.y+15-s.y) < 25) {
+                s.collected = true; power = 300;
+            }
+        });
+
+        if (power > 0) power--;
+
+        vacs.forEach(v => {
+            v.x += v.dir * v.speed;
+            if (Math.abs(v.x - v.startX) > v.range) v.dir *= -1;
+            if (power <= 0 && Math.hypot(player.x+15-v.x, player.y+15-v.y) < 32) {
+                lives--; flashTimer = 20; if (lives <= 0) showGameOver(); else init(curLvl);
+            }
+        });
+
+        if (score >= L.goal && Math.hypot(player.x - L.bed.x, player.y - L.bed.y) < 32) win();
+    }
+
+    function showOverlay(title, msg, btnText, hideColors = false) {
+        gameActive = false;
+        document.getElementById('overlay').style.display = 'flex';
+        document.getElementById('ov-title').textContent  = title;
+        document.getElementById('ov-msg').textContent    = msg;
+        document.getElementById('start-btn').textContent = btnText;
+        document.querySelector('.color-select').style.display = hideColors ? 'none' : 'grid';
+    }
+
+    function showGameOver() {
+        lives = 3; curLvl = 0;
+        showOverlay('GAME OVER', `Try again, ${PET_NAME}!`, 'RETRY', false);
+    }
+    function win() {
+        if (curLvl < LEVELS.length - 1) {
+            curLvl++;
+            showOverlay('LEVEL CLEAR!', `Amazing job, ${PET_NAME}!\n\n${OWNER_MSG}`, 'NEXT LEVEL', true);
+        } else {
+            gameActive = false; // stop game
+
+            showOverlay(
+                '🎉 YOU DID IT! 🐾',
+                `${PET_NAME} found the house!\n\nYou made it home!\n\n${OWNER_MSG}`,
+                'PLAY AGAIN',
+                false
+            );
+
+            // handle restart click
+            document.getElementById('start-btn').onclick = () => {
+                curLvl = 0;
+                lives = 3;
+                document.getElementById('overlay').style.display = 'none';
+                gameActive = true;
+                init(curLvl);
+            };
+        }
+    }
+
+// 🔥 FINAL RENDER LOOP (DO NOT CHANGE)
+function loop() {
+    const pal = getPal();
+
+    // gradient background
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, pal.bg);
+    grad.addColorStop(1, '#000');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // subtle particles
+    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    for (let i = 0; i < 20; i++) {
+        ctx.fillRect((i * 50 + Date.now()/50) % W, i * 15, 2, 2);
+    }
+
+    // platforms with outline
+    LEVELS[curLvl].platforms.forEach(p => {
+        ctx.fillStyle = pal.platform;
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+
+        outlineRect(p.x, p.y, p.w, p.h);
+
+        ctx.fillStyle = pal.platformTop;
+        ctx.fillRect(p.x, p.y, p.w, 4);
+    });
+
+    drawDogHouse(LEVELS[curLvl].bed.x, LEVELS[curLvl].bed.y);
+
+    bones.forEach(b => { if (!b.collected) drawBone(b.x, b.y); });
+    steaks.forEach(s => { if (!s.collected) drawChicken(s.x, s.y); });
+
+    vacs.forEach(drawVacuum);
+    drawDog(player.x, player.y, player.dir, power);
+    if (flashTimer > 0) {
+        ctx.fillStyle = `rgba(255,0,0,${flashTimer / 40})`;
+        ctx.fillRect(0, 0, W, H);
+        flashTimer--;
+    }
+    update();
+    requestAnimationFrame(loop);
+}
+// ==============================
+// INPUT + UI (REQUIRED)
+// ==============================
+
+// COLOR SELECT
+document.querySelectorAll('.color-opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+        document.querySelectorAll('.color-opt').forEach(o => o.classList.remove('active-opt'));
+        opt.classList.add('active-opt');
+        selectedDog = parseInt(opt.dataset.idx);
+    });
+});
+
+// START BUTTON
+document.getElementById('start-btn').addEventListener('click', () => {
+    document.getElementById('overlay').style.display = 'none';
+    gameActive = true;
+    init(curLvl);
+});
+
+// KEYBOARD
+window.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft')  keys.left  = true;
+    if (e.key === 'ArrowRight') keys.right = true;
+    if (e.key === 'ArrowUp' || e.key === ' ') keys.jump = true;
+});
+
+window.addEventListener('keyup', e => {
+    if (e.key === 'ArrowLeft')  keys.left  = false;
+    if (e.key === 'ArrowRight') keys.right = false;
+
+    if (e.key === 'ArrowUp' || e.key === ' ') {
+        keys.jump = false;
+        jumpLocked = false;
+    }
+});
+
+// MOBILE
+document.getElementById('btn-left').addEventListener('touchstart',  e => { e.preventDefault(); keys.left  = true; });
+document.getElementById('btn-left').addEventListener('touchend',    e => { e.preventDefault(); keys.left  = false; });
+document.getElementById('btn-right').addEventListener('touchstart', e => { e.preventDefault(); keys.right = true; });
+document.getElementById('btn-right').addEventListener('touchend',   e => { e.preventDefault(); keys.right = false; });
+document.getElementById('btn-jump').addEventListener('touchstart',  e => { e.preventDefault(); if (!jumpLocked) keys.jump = true; });
+document.getElementById('btn-jump').addEventListener('touchend',    e => { e.preventDefault(); keys.jump = false; jumpLocked = false; });
+// 🔥 START GAME
+init(curLvl);
+loop();
+
+};
+</script>
+</body>
+</html>
