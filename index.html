@@ -29,7 +29,7 @@ body {
     max-width: 95vw;
     padding: 8px 4px;
 }
-#ui span { color: #fff; font-size: 7px; text-shadow: 0 0 5px #000; }
+#ui span { color: #fff; font-size: 12px; text-shadow: 0 0 5px #000; }
 #hearts-ui { color: #ffd700 !important; }
 canvas {
     display: block;
@@ -63,10 +63,11 @@ canvas {
     justify-content: center;
     z-index: 10;
     text-align: center;
-    padding: 20px;
+    padding: 40px;
+    gap: 10px; /* 🔥 adds spacing between elements */
 }
-#overlay h1 { color: #4a90d9; font-size: 16px; margin-bottom: 15px; text-transform: uppercase; }
-#overlay p { color: #ccc; font-size: 8px; line-height: 1.8; margin-bottom: 20px; white-space: pre-line; }
+#overlay h1 { color: #4a90d9; font-size: 34px; margin-bottom: 20px; text-transform: uppercase; }
+#overlay p { color: #ccc; font-size: 15px; line-height: 1.6; margin-bottom: 25px; white-space: pre-line; }
 .color-select { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
 .color-opt { width: 45px; height: 45px; border: 3px solid #fff; cursor: pointer; border-radius: 5px; }
 .active-opt { border-color: #4a90d9 !important; transform: scale(1.1); box-shadow: 0 0 10px #4a90d9; }
@@ -84,9 +85,9 @@ canvas {
 
 #start-btn {
     background: #4a90d9; border: none; color: white;
-    padding: 15px 30px; font-family: monospace; cursor: pointer; font-size: 10px;
+    padding: 22px 50px; font-family: monospace; cursor: pointer; font-size: 16px;
 }
-#power-indicator { color: #ff4d4d; font-size: 8px; margin-top: 5px; height: 10px; }
+#power-indicator { color: #ff4d4d; font-size: 12px; margin-top: 5px; height: 10px; }
 </style>
 </head>
 <body>
@@ -107,40 +108,42 @@ canvas {
 </div>
 
 <div id="overlay">
-  <h1 id="ov-title" id="ov-title"></h1>
-    <p id="ov-msg"></p>
-<p style="color:#fff; font-size:7px; margin-bottom:8px;">Pick your dog's color:</p>
-<div class="color-select">
-    <div class="color-wrap"><div class="color-opt active-opt" data-idx="0" style="background:#edc9af"></div><span>Tan</span></div>
-    <div class="color-wrap"><div class="color-opt" data-idx="1" style="background:#222222"></div><span>Black</span></div>
-    <div class="color-wrap"><div class="color-opt" data-idx="2" style="background:#eeeeee"></div><span>White</span></div>
-    <div class="color-wrap"><div class="color-opt" data-idx="3" style="background:#e8a825"></div><span>Golden</span></div>
-    <div class="color-wrap"><div class="color-opt" data-idx="4" style="background:#7e5835"></div><span>Brown</span></div>
-    <div class="color-wrap"><div class="color-opt" data-idx="5" style="background:#888888"></div><span>Grey</span></div>
+  <canvas id="preview" width="300" height="200"></canvas>
+
+  <h1 id="ov-title"></h1>
+  <p id="ov-msg"></p>
+
+<button type="button" id="start-btn">START PLAYING</button>
 </div>
 
-  <button id="start-btn">START PLAYING</button>
-</div>
 <script>
 window.onload = function() {
     const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    const W = 480, H = 320;
+const ctx = canvas.getContext('2d');
+const W = 480, H = 320;
 
-    const params = new URLSearchParams(window.location.search);
-    const PET_NAME   = params.get("pet")   || ("{{PET_NAME}}".includes("{{")      ? "Good Dog"        : "{{PET_NAME}}");
-    const OWNER_NAME = params.get("owner") || ("{{OWNER_NAME}}".includes("{{")    ? "Your Human"      : "{{OWNER_NAME}}");
-    const OWNER_MSG  = params.get("msg")   || ("{{OWNER_MESSAGE}}".includes("{{") ? "You made it home!" : "{{OWNER_MESSAGE}}");
-    document.getElementById('ov-title').textContent = `${PET_NAME}'S ADVENTURE!`;
+const params = new URLSearchParams(window.location.search);
+
+// 1. Extract values with fallback checks
+const rawPet   = params.get("pet");
+const rawOwner = params.get("owner");
+const rawMsg   = params.get("msg");
+
+// 2. Sanitize: Use real value if it exists and isn't a template tag, otherwise use default
+const PET_NAME   = (rawPet && !rawPet.includes("{{"))   ? rawPet   : "Good Dog";
+const OWNER_NAME = (rawOwner && !rawOwner.includes("{{")) ? rawOwner : "Your Human";
+const OWNER_MSG  = (rawMsg && !rawMsg.includes("{{"))   ? rawMsg   : "You are the best friend!";
+
+// 3. Update the UI text once
+document.getElementById('ov-title').textContent = PET_NAME;
 document.getElementById('ov-msg').textContent = `Collect all the bones 🦴 and reach the Dog House!\nWatch out for Vacuums 🤖 — grab the big bone 🦴 for protection!\n\nUse ◀ ▶ to move and ▲ to jump.\n\nWith love from ${OWNER_NAME}`;
-
     // Rule: dark dog (Black, Brown) → LIGHT bg so dog pops
     //       light dog (Tan, White, Golden, Grey) → DARK bg
     const DOG_PALETTES = [
         { name:'Tan',    main:'#edc9af', belly:'#f5e4d0', ear:'#c49a6c', nose:'#3d2b1f', eye:'#3d2b1f',
           bg:'#0c0a18', platform:'#1e1830', platformTop:'#2e2848' },
-        { name:'Black',  main:'#2a2a2a', belly:'#FFFFFF', ear:'#111111', nose:'#888888', eye:'#88ccff',
-          bg:'#c8bfa0', platform:'#a89878', platformTop:'#c8b888' },
+        { name:'Black & White',main:'#333333',belly:'#f2f2f2',ear:'#111111',nose:'#888888',eye:'#88ccff',
+        bg:'#c8bfa0',platform:'#a89878',platformTop:'#c8b888'},
         { name:'White',  main:'#eeeeee', belly:'#ffffff', ear:'#cccccc', nose:'#cc8888', eye:'#4a90d9',
           bg:'#1a1a2e', platform:'#2e2e50', platformTop:'#404070' },
         { name:'Golden', main:'#e8a825', belly:'#f5d27a', ear:'#b06a00', nose:'#3d2b1f', eye:'#3d2b1f',
@@ -149,9 +152,12 @@ document.getElementById('ov-msg').textContent = `Collect all the bones 🦴 and 
           bg:'#b8c8a8', platform:'#8aaa78', platformTop:'#aac898' },
         { name:'Grey',   main:'#909090', belly:'#bbbbbb', ear:'#606060', nose:'#333333', eye:'#4a90d9',
           bg:'#0a0a0a', platform:'#1e1e1e', platformTop:'#303030' },
+        { name:'Black',main:'#2a2a2a',belly:'#2a2a2a',bg:'#c8bfa0',platform:'#a89878',platformTop:'#c8b888'}
     ];
-
-    let selectedDog = 0;
+    let selectedDog = parseInt(params.get("color"));
+    if (isNaN(selectedDog) || selectedDog < 0 || selectedDog >= DOG_PALETTES.length) {
+        selectedDog = 0;
+    }
     let gameActive = false;
     let curLvl = 0, score = 0, lives = 3, power = 0, flashTimer = 0;
     let player = { x:30, y:200, vx:0, vy:0, ground:false, dir:1 };
@@ -186,7 +192,7 @@ document.getElementById('ov-msg').textContent = `Collect all the bones 🦴 and 
     function getPal() {
         const p = DOG_PALETTES[selectedDog];
     
-        const isDarkDog = ['Black', 'Brown', 'Grey'].includes(p.name);
+        const isDarkDog = ['Black', 'Black & White', 'Brown', 'Grey'].includes(p.name);
     
         return {
             ...p,
@@ -213,12 +219,13 @@ document.getElementById('ov-msg').textContent = `Collect all the bones 🦴 and 
     }
 
     // Fills a 1px dark border around a rect (pixel-art outline helper)
-    function darkBorder(x, y, w, h) {
-        ctx.fillRect(x-1, y-1, w+2, 1);   // top
-        ctx.fillRect(x-1, y+h, w+2, 1);   // bottom
-        ctx.fillRect(x-1, y,   1,   h);   // left
-        ctx.fillRect(x+w, y,   1,   h);   // right
-    }
+    function darkBorder(target, x, y, w, h) {
+    target.fillStyle = '#000';
+    target.fillRect(x-1, y-1, w+2, 1);
+    target.fillRect(x-1, y+h, w+2, 1);
+    target.fillRect(x-1, y, 1, h);
+    target.fillRect(x+w, y, 1, h);
+}
     function outlineRect(x, y, w, h, color = 'rgba(0,0,0,0.6)') {
     ctx.fillStyle = color;
     ctx.fillRect(x-1, y-1, w+2, 1);
@@ -226,107 +233,111 @@ document.getElementById('ov-msg').textContent = `Collect all the bones 🦴 and 
     ctx.fillRect(x-1, y, 1, h);
     ctx.fillRect(x+w, y, 1, h);
     }
-    function drawDog(x, y, dir, pwr) {
-        const c   = getPal();
-        const wag = Math.sin(Date.now() / 50) * 3;
+   function drawDog(targetCtx, x, y, dir, pwr) {
+    const c = getPal();
+    const wag = Math.sin(Date.now() / 50) * 3;
 
-        ctx.save();
-        ctx.translate(x, y);
+    targetCtx.save();
+    targetCtx.translate(x, y);
 
-        // 🔥 grounding shadow (this changes everything visually)
-        ctx.fillStyle = 'rgba(0,0,0,0.25)';
-        ctx.fillRect(5, 30, 18, 4);
-        
-        // name tag
-        ctx.fillStyle = '#fff';
-        ctx.font = "6px monospace";
-        ctx.textAlign = 'center';
-        ctx.fillText(PET_NAME.toUpperCase(), 15, -8);
+    targetCtx.fillStyle = 'rgba(0,0,0,0.25)';
+    targetCtx.fillRect(5, 30, 18, 4);
 
-        if (dir < 0) { ctx.translate(28, 0); ctx.scale(-1, 1); }
-        if (pwr > 0) { ctx.shadowBlur = 15; ctx.shadowColor = '#ff4d4d'; }
+    targetCtx.fillStyle = '#fff';
+    targetCtx.font = "10px monospace";
+    targetCtx.textAlign = 'center';
+    targetCtx.fillText(PET_NAME.toUpperCase(), 15, -8);
 
-        // ── OUTLINE PASS ──────────────────────────────────
-        ctx.fillStyle = 'rgba(0,0,0,0.9)';
+    if (dir < 0) { targetCtx.translate(28, 0); targetCtx.scale(-1, 1); }
+    if (pwr > 0) { targetCtx.shadowBlur = 15; targetCtx.shadowColor = '#ff4d4d'; }
 
-        // tail outline
-        ctx.save();
-        ctx.translate(2, 12);
-        ctx.rotate(wag * Math.PI / 180);
-        darkBorder(-7, -3, 8, 5);
-        ctx.restore();
+    targetCtx.fillStyle = 'rgba(0,0,0,0.9)';
 
-        darkBorder(2,  14, 24, 14); // body
-        darkBorder(5,  26,  6,  8); // front leg
-        darkBorder(18, 26,  6,  8); // back leg
-        darkBorder(18,  8, 10,  8); // neck
-        darkBorder(20,  2, 16, 14); // head
-        darkBorder(32,  8,  8,  7); // snout
-        darkBorder(20,  0,  6,  8); // ear
+    targetCtx.save();
+    targetCtx.translate(2, 12);
+    targetCtx.rotate(wag * Math.PI / 180);
+    darkBorder(targetCtx, -7, -3, 8, 5);
+    targetCtx.restore();
 
-        // ── COLOUR PASS ───────────────────────────────────
+    darkBorder(targetCtx, 2,  14, 24, 14);
+    darkBorder(targetCtx, 5,  26,  6,  8);
+    darkBorder(targetCtx, 18, 26,  6,  8);
+    darkBorder(targetCtx, 18,  8, 10,  8);
+    darkBorder(targetCtx, 20,  2, 16, 14);
+    darkBorder(targetCtx, 32,  8,  8,  7);
+    darkBorder(targetCtx, 20,  0,  6,  8);
 
-        // tail
-        ctx.fillStyle = c.main;
-        ctx.save();
-        ctx.translate(2, 12);
-        ctx.rotate(wag * Math.PI / 180);
-        ctx.fillRect(-7, -3, 8, 5);
-        ctx.restore();
+    targetCtx.fillStyle = c.main;
+    targetCtx.save();
+    targetCtx.translate(2, 12);
+    targetCtx.rotate(wag * Math.PI / 180);
+    targetCtx.fillRect(-7, -3, 8, 5);
+    targetCtx.restore();
 
-        // belly patch
-        ctx.fillStyle = c.belly;
-        ctx.fillRect(6, 18, 12, 10);
+    targetCtx.fillStyle = c.main;
+    targetCtx.fillRect(18, 26, 6, 8);
+    targetCtx.fillRect(2, 14, 24, 14);
+    targetCtx.fillRect(5, 26, 6, 8);
+    targetCtx.fillStyle = c.main;
+    targetCtx.fillRect(18, 8, 10, 8);
+    targetCtx.fillRect(20, 2, 16, 14);
 
-        // body
-        ctx.fillStyle = c.main;
-        ctx.fillRect(2, 14, 24, 14);
+    targetCtx.fillStyle = c.belly;
+    targetCtx.fillRect(32, 8, 8, 7);
 
-        // legs
-        ctx.fillRect(5,  26, 6, 8);
-        ctx.fillRect(18, 26, 6, 8);
+    targetCtx.fillStyle = c.nose;
+    targetCtx.fillRect(37, 8, 4, 3);
 
-        // paws
-        ctx.fillStyle = c.belly;
-        ctx.fillRect(5,  31, 6, 3);
-        ctx.fillRect(18, 31, 6, 3);
+    targetCtx.fillStyle = c.ear;
+    targetCtx.fillRect(20, 0, 6, 8);
+    targetCtx.fillRect(19, 2, 3, 5);
 
-        // neck
-        ctx.fillStyle = c.main;
-        ctx.fillRect(18, 8, 10, 8);
+    if (c.name === 'Black & White') {
+        targetCtx.fillStyle = '#e8e8e8';
+        targetCtx.fillRect(10, 21, 5, 4);
+        targetCtx.fillRect(6, 18, 4, 3);
+        targetCtx.fillRect(18, 16, 3, 2);
+        targetCtx.fillRect(32, 9, 3, 2);
+        targetCtx.fillRect(21, 1, 2, 2);
+        targetCtx.fillStyle = '#bbbbbb';
+        targetCtx.fillRect(5, 31, 6, 2);
+        targetCtx.fillRect(18, 31, 6, 2);
+    }
 
-        // head
-        ctx.fillRect(20, 2, 16, 14);
-
-        // snout
-        ctx.fillStyle = c.belly;
-        ctx.fillRect(32, 8, 8, 7);
-
-        // nose
-        ctx.fillStyle = c.nose;
-        ctx.fillRect(37, 8, 4, 3);
-
-        // ear
-        ctx.fillStyle = c.ear;
-        ctx.fillRect(20, 0, 6, 8);
-        ctx.fillRect(19, 2, 3, 5);
-
-        // eye
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(28, 5, 5, 4);
-        ctx.fillStyle = c.eye;
-        ctx.fillRect(29, 6, 3, 3);
-        ctx.fillStyle = '#000';
-        ctx.fillRect(30, 6, 2, 2);
+        // eye----
+        targetCtx.fillStyle = '#fff';
+        targetCtx.fillRect(28, 5, 5, 4);
+        targetCtx.fillStyle = c.eye;
+        targetCtx.fillRect(29, 6, 3, 3);
+        targetCtx.fillStyle = '#000';
+        targetCtx.fillRect(30, 6, 2, 2);
 
         // collar
-        ctx.fillStyle = '#e74c3c';
-        ctx.fillRect(18, 12, 10, 3);
-        ctx.fillStyle = '#f39c12';
-        ctx.fillRect(22, 13, 3, 3);
+        targetCtx.fillStyle = '#e74c3c';
+        targetCtx.fillRect(18, 12, 10, 3);
+        targetCtx.fillStyle = '#f39c12';
+        targetCtx.fillRect(22, 13, 3, 3);
 
-        ctx.restore();
+        targetCtx.restore();
+}
+    let previewAnimating = true;
+
+    function animatePreviewDog() {
+    const preview = document.getElementById('preview');
+    const pctx = preview.getContext('2d');
+
+    function loopPreview() {
+        if (!previewAnimating) return;
+        pctx.clearRect(0, 0, preview.width, preview.height);
+        pctx.save();
+        pctx.scale(3.5, 3.5);
+        const bounce = Math.sin(Date.now() / 250) * 2;
+        drawDog(pctx, 25, 20 + bounce, 1, 0);
+        pctx.restore();
+        requestAnimationFrame(loopPreview);
     }
+    loopPreview();////
+}
 
     function drawVacuum(v) {
         ctx.save();
@@ -371,89 +382,72 @@ document.getElementById('ov-msg').textContent = `Collect all the bones 🦴 and 
     }
 
     function drawBone(x, y) {
-    ctx.fillStyle = '#f5f5f5';
-    ctx.fillRect(x-6, y-2, 12, 4);
-    ctx.fillRect(x-8, y-4, 4, 4);
-    ctx.fillRect(x-8, y, 4, 4);
-    ctx.fillRect(x+4, y-4, 4, 4);
-    ctx.fillRect(x+4, y, 4, 4);
+        const pal = getPal();
+        ctx.fillStyle = '#f0f0f0';
+        ctx.fillRect(x-5, y-1, 10, 3);
+        ctx.fillRect(x-7, y-3, 4, 3);
+        ctx.fillRect(x-7, y+1, 4, 3);
+        ctx.fillRect(x+3, y-3, 4, 3);
+        ctx.fillRect(x+3, y+1, 4, 3);
 
-    outlineRect(x-8, y-4, 16, 8, '#000');
+        // FIX: Change strokeStyle to match the background color
+        ctx.strokeStyle = pal.bg; 
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x-7.5, y-3.5, 15, 8); // Adjusted slightly for cleaner edges
     }
 
-    // Pixel-art chicken drumstick — matches reference: round dark-brown bulb + grey bone knob
-   function drawChicken(x, y) {
+    function drawChicken(x, y) {
+    const pal = getPal(); // Add this line
     ctx.save();
     ctx.translate(x, y);
-
-    // slight bounce animation
     const bob = Math.sin(Date.now() / 150) * 2;
     ctx.translate(0, bob);
 
-    // shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillStyle = 'rgba(0,0,0,0.1)'; // Lightened shadow
     ctx.fillRect(-14, 10, 28, 4);
 
-    // glow (power-up feel)
     ctx.shadowBlur = 12;
     ctx.shadowColor = '#ffd700';
 
-    // main bone (bigger + thicker)
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(-10, -3, 20, 6);
-
-    // bone ends (round knobs)
     ctx.fillRect(-14, -6, 6, 6);
     ctx.fillRect(-14,  0, 6, 6);
     ctx.fillRect(  8, -6, 6, 6);
     ctx.fillRect(  8,  0, 6, 6);
 
-    // outline (important for contrast)
-    outlineRect(-14, -6, 28, 12, '#000');
+    // FIX: Change '#000' to pal.bg
+    outlineRect(-14, -6, 28, 12, pal.bg); 
 
     ctx.restore();
 }
 
     function drawDogHouse(x, y) {
-        // shadow
-        ctx.fillStyle = 'rgba(0,0,0,0.25)';
-        ctx.fillRect(x-22, y+28, 44, 6);
+    const pal = getPal(); // Add this line
+    ctx.fillStyle = 'rgba(0,0,0,0.1)';
+    ctx.fillRect(x-22, y+28, 44, 6);
 
-        // main structure
-        ctx.fillStyle = '#7e5835';
-        ctx.fillRect(x-20, y+8, 40, 22);
+    ctx.fillStyle = '#7e5835';
+    ctx.fillRect(x-20, y+8, 40, 22);
 
-        // roof
-        ctx.fillStyle = '#c0392b';
-        ctx.fillRect(x-24, y+4, 48, 6);  // roof base
-        ctx.fillRect(x-18, y-2, 36, 8);  // mid roof
-        ctx.fillRect(x-10, y-8, 20, 8);  // peak
+    ctx.fillStyle = '#c0392b';
+    ctx.fillRect(x-24, y+4, 48, 6);
+    ctx.fillRect(x-18, y-2, 36, 8);
+    ctx.fillRect(x-10, y-8, 20, 8);
 
-        // roof outline
-        outlineRect(x-24, y-8, 48, 20, '#000');
+    // FIX: Change '#000' to pal.bg
+    outlineRect(x-24, y-8, 48, 20, pal.bg); 
 
-        // door
-        ctx.fillStyle = '#1a0e0a';
-        ctx.fillRect(x-8, y+14, 16, 16);
+    ctx.fillStyle = '#1a0e0a';
+    ctx.fillRect(x-8, y+14, 16, 16);
+    ctx.fillRect(x-10, y+12, 20, 4);
 
-        // door arch top
-        ctx.fillRect(x-10, y+12, 20, 4);
+    ctx.fillStyle = '#5c3d1e';
+    ctx.fillRect(x-20, y+14, 40, 2);
+    ctx.fillRect(x-20, y+22, 40, 2);
 
-        // wood grain lines
-        ctx.fillStyle = '#5c3d1e';
-        ctx.fillRect(x-20, y+14, 40, 2);
-        ctx.fillRect(x-20, y+22, 40, 2);
-
-        // structure outline
-        outlineRect(x-20, y+8, 40, 22, '#000');
-
-        // glow when goal reached
-        if (score >= LEVELS[curLvl].goal) {
-            ctx.strokeStyle = '#ffd700';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x-26, y-10, 52, 50);
-        }
-    }
+    
+}
 
     function update() {
         if (!gameActive) return;
@@ -514,7 +508,6 @@ document.getElementById('ov-msg').textContent = `Collect all the bones 🦴 and 
         document.getElementById('ov-title').textContent  = title;
         document.getElementById('ov-msg').textContent    = msg;
         document.getElementById('start-btn').textContent = btnText;
-        document.querySelector('.color-select').style.display = hideColors ? 'none' : 'grid';
     }
 
     function showGameOver() {
@@ -535,14 +528,7 @@ document.getElementById('ov-msg').textContent = `Collect all the bones 🦴 and 
                 false
             );
 
-            // handle restart click
-            document.getElementById('start-btn').onclick = () => {
-                curLvl = 0;
-                lives = 3;
-                document.getElementById('overlay').style.display = 'none';
-                gameActive = true;
-                init(curLvl);
-            };
+            
         }
     }
 
@@ -550,12 +536,21 @@ document.getElementById('ov-msg').textContent = `Collect all the bones 🦴 and 
 function loop() {
     const pal = getPal();
 
-    // gradient background
-    const grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, pal.bg);
-    grad.addColorStop(1, '#000');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, H);
+    // detect dark dogs
+    const isDarkDog = ['Black', 'Black & White', 'Brown', 'Grey'].includes(pal.name);
+
+    if (isDarkDog) {
+        // SOLID LIGHT BACKGROUND
+        ctx.fillStyle = pal.bg;
+        ctx.fillRect(0, 0, W, H);
+    } else {
+        // KEEP GRADIENT FOR LIGHT DOGS
+        const grad = ctx.createLinearGradient(0, 0, 0, H);
+        grad.addColorStop(0, pal.bg);
+        grad.addColorStop(1, '#000');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+    }
 
     // subtle particles
     ctx.fillStyle = 'rgba(255,255,255,0.03)';
@@ -580,7 +575,7 @@ function loop() {
     steaks.forEach(s => { if (!s.collected) drawChicken(s.x, s.y); });
 
     vacs.forEach(drawVacuum);
-    drawDog(player.x, player.y, player.dir, power);
+    drawDog(ctx, player.x, player.y, player.dir, power);
     if (flashTimer > 0) {
         ctx.fillStyle = `rgba(255,0,0,${flashTimer / 40})`;
         ctx.fillRect(0, 0, W, H);
@@ -593,17 +588,18 @@ function loop() {
 // INPUT + UI (REQUIRED)
 // ==============================
 
-// COLOR SELECT
-document.querySelectorAll('.color-opt').forEach(opt => {
-    opt.addEventListener('click', () => {
-        document.querySelectorAll('.color-opt').forEach(o => o.classList.remove('active-opt'));
-        opt.classList.add('active-opt');
-        selectedDog = parseInt(opt.dataset.idx);
-    });
-});
 
-// START BUTTON
-document.getElementById('start-btn').addEventListener('click', () => {
+document.getElementById('start-btn').addEventListener('click', (e) => {
+    e.preventDefault(); 
+    
+    // If the player is on the final win screen or game over screen, reset stats
+    const btnText = document.getElementById('start-btn').textContent;
+    if (btnText === 'PLAY AGAIN' || btnText === 'RETRY') {
+        curLvl = 0;
+        lives = 3;
+    }
+
+    previewAnimating = false;
     document.getElementById('overlay').style.display = 'none';
     gameActive = true;
     init(curLvl);
@@ -636,6 +632,7 @@ document.getElementById('btn-jump').addEventListener('touchend',    e => { e.pre
 // 🔥 START GAME
 init(curLvl);
 loop();
+animatePreviewDog();
 
 };
 </script>
