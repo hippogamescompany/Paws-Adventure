@@ -84,8 +84,16 @@ canvas {
 .color-wrap span { color: #fff; font-size: 6px; }
 
 #start-btn {
-    background: #4a90d9; border: none; color: white;
-    padding: 22px 50px; font-family: monospace; cursor: pointer; font-size: 16px;
+    background: #4a90d9; 
+    border: none; 
+    color: white;
+    padding: 22px 50px; 
+    font-family: monospace; 
+    cursor: pointer; 
+    font-size: 16px;
+    display: inline-block;
+    user-select: none;
+    -webkit-user-select: none;
 }
 #power-indicator { color: #ff4d4d; font-size: 12px; margin-top: 5px; height: 10px; }
 </style>
@@ -113,31 +121,24 @@ canvas {
   <h1 id="ov-title"></h1>
   <p id="ov-msg"></p>
 
-<button type="button" id="start-btn">START PLAYING</button>
+<div id="start-btn" style="display: inline-block;">START PLAYING</div>
 </div>
 
 <script>
 window.onload = function() {
     const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-const W = 480, H = 320;
+    const ctx = canvas.getContext('2d');
+    const W = 480, H = 320;
 
-const params = new URLSearchParams(window.location.search);
+    // Use a local variable for params so it doesn't stay in the global window scope
+    const params = new URLSearchParams(window.location.search);
 
-// 1. Extract values with fallback checks
-const rawPet   = params.get("pet");
-const rawOwner = params.get("owner");
-const rawMsg   = params.get("msg");
+    const PET_NAME   = (params.get("pet") && !params.get("pet").includes("{{")) ? params.get("pet") : "Good Dog";
+    const OWNER_NAME = (params.get("owner") && !params.get("owner").includes("{{")) ? params.get("owner") : "Your Human";
+    const OWNER_MSG  = (params.get("msg") && !params.get("msg").includes("{{")) ? params.get("msg") : "You are the best friend!";
 
-// 2. Sanitize: Use real value if it exists and isn't a template tag, otherwise use default
-const PET_NAME   = (rawPet && !rawPet.includes("{{"))   ? rawPet   : "Good Dog";
-const OWNER_NAME = (rawOwner && !rawOwner.includes("{{")) ? rawOwner : "Your Human";
-const OWNER_MSG  = (rawMsg && !rawMsg.includes("{{"))   ? rawMsg   : "You are the best friend!";
-
-// 3. Update the UI text once
-document.getElementById('ov-title').textContent = PET_NAME;
-document.getElementById('ov-msg').textContent = `Collect all the bones 🦴 and reach the Dog House!\nWatch out for Vacuums 🤖 — grab the big bone 🦴 for protection!\n\nUse ◀ ▶ to move and ▲ to jump.\n\nWith love from ${OWNER_NAME}`;
-    // Rule: dark dog (Black, Brown) → LIGHT bg so dog pops
+    document.getElementById('ov-title').textContent = PET_NAME;
+    document.getElementById('ov-msg').textContent = `Collect all the bones 🦴 and reach the Dog House!\nWatch out for Vacuums 🤖 — grab the chicken leg 🍗 for protection!\n\nUse ◀ ▶ to move and ▲ to jump.\n\nWith love from ${OWNER_NAME}`;// Rule: dark dog (Black, Brown) → LIGHT bg so dog pops
     //       light dog (Tan, White, Golden, Grey) → DARK bg
     const DOG_PALETTES = [
         { name:'Tan',    main:'#edc9af', belly:'#f5e4d0', ear:'#c49a6c', nose:'#3d2b1f', eye:'#3d2b1f',
@@ -168,23 +169,54 @@ document.getElementById('ov-msg').textContent = `Collect all the bones 🦴 and 
     const LEVELS = [
       {
         platforms:[{x:0,y:288,w:480,h:32},{x:100,y:220,w:100,h:15},{x:280,y:180,w:100,h:15},{x:50,y:140,w:80,h:15}],
-        bones:[{x:120,y:200},{x:300,y:160},{x:70,y:120},{x:400,y:260},{x:200,y:260}],
+        bones:[{x:120,y:200},{x:300,y:160},{x:70,y:120},{x:100,y:260},{x:200,y:260}],
         steaks:[{x:330,y:260}],
         vacuums:[{x:250,y:274,range:100,speed:1.5,dir:1}],
         bed:{x:420,y:260}, goal:5
       },
       {
-        platforms:[{x:0,y:288,w:150,h:32},{x:200,y:240,w:100,h:15},{x:350,y:288,w:130,h:32},{x:100,y:160,w:80,h:15},{x:250,y:120,w:100,h:15}],
-        bones:[{x:30,y:260},{x:220,y:220},{x:380,y:260},{x:120,y:140},{x:270,y:100},{x:440,y:260}],
+        // Platform 1 is your "starting ledge"
+        platforms:[
+            {x:0, y:288, w:160, h:32},   // Starting ledge (made it slightly wider)
+            {x:200, y:240, w:100, h:15},  // Middle floating island
+            {x:350, y:288, w:130, h:32},  // Ending ledge with the house
+            {x:100, y:160, w:80, h:15},   // High platform left
+            {x:250, y:120, w:100, h:15}   // High platform right
+        ],
+        bones: [
+    {x:40,  y:250}, // 1. The "Start" bone (moved up slightly for a hop)
+    {x:140, y:130}, // 2. High Left - Encourages using the upper platforms
+    {x:250, y:90},  // 3. Peak Bone - The highest point of the level
+    {x:250, y:210}, // 4. The Island - Right in the middle of the gap
+    {x:370, y:150}, // 5. The "leap of faith" back down to the final ledge
+    {x:380, y:260}  // 6. The "Victory" bone near the house
+],
         steaks:[{x:400,y:180}],
-        vacuums:[{x:80,y:274,range:50,speed:2,dir:1},{x:380,y:274,range:40,speed:2,dir:-1}],
-        bed:{x:420,y:260}, goal:6
-      },
+        vacuums:[
+            // Moved the first vacuum further right (startX: 110) 
+            // so it doesn't hit the player at spawn (x:40)
+            {x:110, y:274, range:40, speed:2, dir:-1}, 
+            {x:380, y:274, range:40, speed:2, dir:-1}
+        ],
+        bed:{x:440, y:260}, 
+        goal:6
+        },
       {
-        platforms:[{x:0,y:288,w:480,h:32},{x:50,y:220,w:60,h:15},{x:150,y:170,w:60,h:15},{x:250,y:120,w:100,h:15},{x:380,y:180,w:80,h:15}],
-        bones:[{x:20,y:260},{x:80,y:190},{x:180,y:140},{x:300,y:90},{x:420,y:150},{x:450,y:260}],
-        steaks:[{x:280,y:260}],
-        vacuums:[{x:100,y:274,range:60,speed:2.2,dir:1},{x:300,y:274,range:80,speed:1.8,dir:-1},{x:250,y:106,range:40,speed:3,dir:1}],
+        platforms:[{x:0,y:288,w:480,h:32},{x:50,y:220,w:60,h:15},{x:150,y:170,w:60,h:15},{x:250,y:120,w:100,h:15},{x:380,y:180,w:80,h:15}],//nothing
+        bones:[
+    {x:80,  y:190}, // Platform 1
+    {x:180, y:140}, // Platform 2
+    {x:300, y:90},  // Highest Platform
+    {x:420, y:150}, // Far Right Platform
+    {x:250, y:260}, // Danger Bone: On the floor between vacuums
+    {x:380, y:260}  // Final Bone: Near the finish line
+],
+        steaks:[{x:300, y:70}], // Placed at the very top of the level
+       vacuums:[
+    {x:80,  y:274, range:60, speed:1.8, dir:1},  // Left floor patroller
+    {x:240, y:274, range:50, speed:2.0, dir:-1}, // Middle floor patroller
+    {x:400, y:274, range:40, speed:2.2, dir:1}   // Right floor patroller (guards the house)
+],
         bed:{x:420,y:260}, goal:6
       }
     ];
@@ -203,14 +235,30 @@ document.getElementById('ov-msg').textContent = `Collect all the bones 🦴 and 
     }
 
     function init(lvlIdx) {
-        const L = LEVELS[lvlIdx];
-        score = 0; power = 0;
-        player = { x:30, y:200, vx:0, vy:0, ground:false, dir:1 };
-        bones  = L.bones.map(b  => ({...b,  collected:false}));
-        steaks = L.steaks.map(s => ({...s,  collected:false}));
-        vacs   = L.vacuums.map(v => ({...v, startX:v.x}));
-        updateUI();
+    const L = LEVELS[lvlIdx];
+    score = 0; power = 0;
+    
+    // Default spawn
+    player = { x:30, y:200, vx:0, vy:0, ground:false, dir:1 };
+
+    // Level 2 Specific spawn: Move player further back and higher
+    if (lvlIdx === 1) { 
+        player.x = 20; 
+        player.y = 150; // Spawn in the air so you land safely
     }
+
+    bones  = L.bones.map(b  => ({...b,  collected:false}));
+    steaks = L.steaks.map(s => ({...s,  collected:false}));
+    
+    // Force vacuums to start with their assigned direction from the Level data
+    vacs = L.vacuums.map(v => ({
+        ...v, 
+        startX: v.x,
+        dir: v.dir // explicitly set from the level config
+    }));
+    
+    updateUI();
+}
 
     function updateUI() {
         document.getElementById('hearts-ui').textContent = `🦴 ${score}/${LEVELS[curLvl].goal}`;
@@ -382,42 +430,74 @@ document.getElementById('ov-msg').textContent = `Collect all the bones 🦴 and 
     }
 
     function drawBone(x, y) {
-        const pal = getPal();
-        ctx.fillStyle = '#f0f0f0';
-        ctx.fillRect(x-5, y-1, 10, 3);
-        ctx.fillRect(x-7, y-3, 4, 3);
-        ctx.fillRect(x-7, y+1, 4, 3);
-        ctx.fillRect(x+3, y-3, 4, 3);
-        ctx.fillRect(x+3, y+1, 4, 3);
+    const pal = getPal();
+    
+    // 1. Draw the "Shadow/Outline" first (using the platform top color for contrast)
+    ctx.fillStyle = pal.platformTop; 
+    ctx.fillRect(x-6, y-2, 12, 5); // shaft shadow
+    ctx.fillRect(x-8, y-4, 5, 5); // knob shadows
+    ctx.fillRect(x-8, y+1, 5, 5);
+    ctx.fillRect(x+3, y-4, 5, 5);
+    ctx.fillRect(x+3, y+1, 5, 5);
 
-        // FIX: Change strokeStyle to match the background color
-        ctx.strokeStyle = pal.bg; 
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x-7.5, y-3.5, 15, 8); // Adjusted slightly for cleaner edges
-    }
+    // 2. Draw the Main Bone White (slightly smaller so the shadow shows as an outline)
+    ctx.fillStyle = '#ffffff';
+    // shaft
+    ctx.fillRect(x-5, y-1, 10, 3);
+    // four knobs
+    ctx.fillRect(x-7, y-3, 4, 3);
+    ctx.fillRect(x-7, y+1, 4, 3);
+    ctx.fillRect(x+3, y-3, 4, 3);
+    ctx.fillRect(x+3, y+1, 4, 3);
+    
+    // 3. Add a "marrow" highlight (optional, for extra detail)
+    ctx.fillStyle = '#e0e0e0';
+    ctx.fillRect(x-3, y+1, 6, 1);
+}
 
     function drawChicken(x, y) {
-    const pal = getPal(); // Add this line
+    const pal = getPal();
     ctx.save();
     ctx.translate(x, y);
+
+    // Subtle bobbing animation
     const bob = Math.sin(Date.now() / 150) * 2;
     ctx.translate(0, bob);
 
-    ctx.fillStyle = 'rgba(0,0,0,0.1)'; // Lightened shadow
-    ctx.fillRect(-14, 10, 28, 4);
+    // 1. Shadow on the ground (keep it very light so it's not a black blob)
+    ctx.fillStyle = 'rgba(0,0,0,0.1)';
+    ctx.fillRect(-14, 12, 28, 3);
 
-    ctx.shadowBlur = 12;
+    // 2. The Glow (Power-up effect)
+    ctx.shadowBlur = 15;
     ctx.shadowColor = '#ffd700';
 
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(-10, -3, 20, 6);
-    ctx.fillRect(-14, -6, 6, 6);
-    ctx.fillRect(-14,  0, 6, 6);
-    ctx.fillRect(  8, -6, 6, 6);
-    ctx.fillRect(  8,  0, 6, 6);
+    // 3. DARK OUTLINE LAYER (using platform color for contrast)
+    ctx.fillStyle = pal.platformTop;
+    // Outline for the meat part
+    ctx.fillRect(-11, -7, 18, 14); 
+    // Outline for the bone part
+    ctx.fillRect(5, -4, 11, 8);
+    // Outline for the bone knobs
+    ctx.fillRect(13, -7, 6, 6);
+    ctx.fillRect(13, 1, 6, 6);
 
-    // FIX: Change '#000' to pal.bg
-    outlineRect(-14, -6, 28, 12, pal.bg); 
+    // 4. MAIN COLORS (layered on top of the outline)
+    ctx.shadowBlur = 0; // Turn off shadow for the actual colors
+
+    // The Bone (White)
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(6, -3, 10, 6); // bone shaft
+    ctx.fillRect(14, -6, 4, 4);  // top knob
+    ctx.fillRect(14, 2, 4, 4);   // bottom knob
+
+    // The Meat (Golden Brown)
+    ctx.fillStyle = '#a0522d'; 
+    ctx.fillRect(-10, -6, 16, 12);
+    
+    // Meat Highlight (gives it shape)
+    ctx.fillStyle = '#cd853f';
+    ctx.fillRect(-8, -4, 10, 3);
 
     ctx.restore();
 }
@@ -589,12 +669,11 @@ function loop() {
 // ==============================
 
 
-document.getElementById('start-btn').addEventListener('click', (e) => {
-    e.preventDefault(); 
+document.getElementById('start-btn').onclick = function(e) {
+    if (e) e.preventDefault();
     
-    // If the player is on the final win screen or game over screen, reset stats
-    const btnText = document.getElementById('start-btn').textContent;
-    if (btnText === 'PLAY AGAIN' || btnText === 'RETRY') {
+    // Reset game state if starting over
+    if (this.textContent === 'PLAY AGAIN' || this.textContent === 'RETRY') {
         curLvl = 0;
         lives = 3;
     }
@@ -603,7 +682,8 @@ document.getElementById('start-btn').addEventListener('click', (e) => {
     document.getElementById('overlay').style.display = 'none';
     gameActive = true;
     init(curLvl);
-});
+    return false; // Extra insurance against refreshing
+};
 
 // KEYBOARD
 window.addEventListener('keydown', e => {
